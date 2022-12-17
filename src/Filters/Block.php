@@ -837,13 +837,19 @@ class Block
             $filteredSearchAdapter->addFilter('id_group', $userGroups);
         }
 
+        // By default, the category filter block shows all children of the current category.
+        // But it can be configured, that you want to display for example only 1 level down,
+        // the direct children.
         $depth = (int) Configuration::get('PS_LAYERED_FILTER_CATEGORY_DEPTH', null, null, null, 1);
 
+        // In this case, we will limit the displayed categories by their level.
+        // We will take the level of the current category and add the depth limit.
         if ($depth) {
             $levelDepth = $parent->level_depth;
             $filteredSearchAdapter->addFilter('level_depth', [$depth + $levelDepth], '<=');
         }
 
+        // Not sure what this does, need to investigate
         $filteredSearchAdapter->addFilter('nleft', [$parent->nleft], '>');
         $filteredSearchAdapter->addFilter('nright', [$parent->nright], '<');
     }

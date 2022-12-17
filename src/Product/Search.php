@@ -153,12 +153,12 @@ class Search
 
     /**
      * @param array $selectedFilters
-     * @param Category $parent
+     * @param Category $parentCategory
      * @param int $idShop
      */
-    private function addSearchFilters($selectedFilters, $parent, $idShop)
+    private function addSearchFilters($selectedFilters, $parentCategory, $idShop)
     {
-        $hasCategory = false;
+        $categoryFilterApplied = false;
         foreach ($selectedFilters as $key => $filterValues) {
             if (!count($filterValues)) {
                 continue;
@@ -188,7 +188,7 @@ class Search
                 case 'category':
                     $this->addFilter('id_category', $filterValues);
                     $this->getSearchAdapter()->resetFilter('id_category_default');
-                    $hasCategory = true;
+                    $categoryFilterApplied = true;
                     break;
 
                 case 'quantity':
@@ -305,11 +305,14 @@ class Search
             }
         }
 
-        if (!$hasCategory && $parent !== null) {
-            $this->getSearchAdapter()->addFilter('nleft', [$parent->nleft], '>=');
-            $this->getSearchAdapter()->addFilter('nright', [$parent->nright], '<=');
+        // If no category filter was applied, we will use the current category,
+        // products of this category or it's children
+        if (!$categoryFilterApplied && $parentCategory !== null) {
+            $this->getSearchAdapter()->addFilter('nleft', [$parentCategory->nleft], '>=');
+            $this->getSearchAdapter()->addFilter('nright', [$parentCategory->nright], '<=');
         }
 
+        // Apply basic filtering for ID shop and avoid duplicate results that may occur
         $this->getSearchAdapter()->addFilter('id_shop', [$idShop]);
         $this->getSearchAdapter()->addGroupBy('id_product');
 
