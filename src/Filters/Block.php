@@ -267,9 +267,9 @@ class Block
     private function ignorePriceAndWeightFilters(InterfaceAdapter $filteredSearchAdapter)
     {
         // disable the current price and weight filters to compute ranges
-        $priceFilter = $filteredSearchAdapter->getFilter('price');
+        $priceFilter = $filteredSearchAdapter->getFilter('computed_price');
         $weightFilter = $filteredSearchAdapter->getFilter('weight');
-        $filteredSearchAdapter->resetFilter('price');
+        $filteredSearchAdapter->resetFilter('computed_price');
         $filteredSearchAdapter->resetFilter('weight');
 
         return [
@@ -292,7 +292,7 @@ class Block
         $weightFilter
     ) {
         // put back the price and weight filters
-        $filteredSearchAdapter->setFilter('price', $priceFilter);
+        $filteredSearchAdapter->setFilter('computed_price', $priceFilter);
         $filteredSearchAdapter->setFilter('weight', $weightFilter);
     }
 

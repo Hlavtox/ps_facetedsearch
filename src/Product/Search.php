@@ -434,7 +434,7 @@ class Search
      */
     private function addPriceFilter($minPrice, $maxPrice)
     {
-        $this->getSearchAdapter()->addFilter('price', [$maxPrice], '<=');
-        $this->getSearchAdapter()->addFilter('price', [$minPrice], '>=');
+        $this->getSearchAdapter()->addFilter('computed_price', [$maxPrice], '<=');
+        $this->getSearchAdapter()->addFilter('computed_price', [$minPrice], '>=');
     }
 }

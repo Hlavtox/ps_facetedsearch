@@ -109,6 +109,14 @@ class MySQL extends AbstractAdapter
         $joinConditions = $this->computeJoinConditions($filterToTableMapping);
         $groupFields = $this->computeGroupByFields($filterToTableMapping);
 
+        $havingConditions = [];
+        foreach ($whereConditions as $k => $v) {
+            if (strpos($v, 'computed_price') !== false) {
+                $havingConditions[] = $v;
+            }
+            unset($whereConditions[$k]);
+        }
+
         $query .= implode(', ', $selectFields) . ' FROM ' . $referenceTable . ' p';
 
         foreach ($joinConditions as $joinAliasInfos) {
@@ -124,6 +132,10 @@ class MySQL extends AbstractAdapter
 
         if ($groupFields) {
             $query .= ' GROUP BY ' . implode(', ', $groupFields);
+        }
+
+        if (!empty($havingConditions)) {
+            $query .= ' HAVING ' . implode(' AND ', $havingConditions);
         }
 
         if ($orderField) {
@@ -315,7 +327,6 @@ class MySQL extends AbstractAdapter
                     specific_price.id_country IN (0, ' . $this->getContext()->country->id . ') AND 
                     specific_price.id_group IN (0, ' . $this->getContext()->customer->id_default_group . ') AND 
                     specific_price.from_quantity = 1 AND
-                    specific_price.reduction > 0 AND
                     specific_price.id_customer = 0 AND
                     specific_price.id_cart = 0 AND 
                     (specific_price.from = \'0000-00-00 00:00:00\' OR \'' . date('Y-m-d H:i:s') . '\' >= specific_price.from) AND 
@@ -362,8 +373,12 @@ class MySQL extends AbstractAdapter
     {
         $orderField = $this->getOrderField();
 
-        if ($this->getInitialPopulation() !== null && !empty($orderField) && $orderField != 'price') {
+        if ($this->getInitialPopulation() !== null && !empty($orderField) && $orderField !== 'price') {
             $this->getInitialPopulation()->addSelectField($orderField);
+        }
+
+        if ($this->getInitialPopulation() !== null && !empty($orderField) && $orderField === 'price') {
+            $this->getInitialPopulation()->addSelectField("IF (specific_price.reduction_type IS NOT NULL, IF(specific_price.reduction_type = 'percentage', p.price * (1-specific_price.reduction), specific_price.price), p.price) AS computed_price");
         }
 
         // do not try to process the orderField if it already has an alias, or if it's a group function
@@ -373,7 +388,7 @@ class MySQL extends AbstractAdapter
         }
 
         $orderField = $this->computeFieldName($orderField, $filterToTableMapping, true);
-
+        
         // put some products at the end of the list
         $orderField = $this->computeShowLast($orderField, $filterToTableMapping);
 
@@ -461,7 +476,7 @@ class MySQL extends AbstractAdapter
                 $fieldName = $joinMapping['aggregateFunction'] . '(' . $fieldName . ') as ' . $joinMapping['aggregateFieldName'];
             }
         } else {
-            if (strpos($fieldName, '(') === false) {
+            if (strpos($fieldName, '(') === false && $fieldName != 'computed_price') {
                 $fieldName = 'p.' . $fieldName;
             }
         }
@@ -480,6 +495,9 @@ class MySQL extends AbstractAdapter
     {
         $selectFields = [];
         foreach ($this->getSelectFields() as $key => $selectField) {
+            if ($selectField === 'computed_price') {
+                continue;
+            }
             $selectFields[] = $this->computeFieldName($selectField, $filterToTableMapping);
         }
 
@@ -598,7 +616,12 @@ class MySQL extends AbstractAdapter
             }
         }
 
-        return $whereConditions;
+        $tmp = [];
+        foreach ($whereConditions as $condition) {
+            $tmp[] = str_replace("p.computed_price", "computed_price", $condition);
+        }
+
+        return $tmp;
     }
 
     /**
@@ -615,20 +638,22 @@ class MySQL extends AbstractAdapter
         $this->addJoinList($joinList, $this->getSelectFields(), $filterToTableMapping);
         $this->addJoinList($joinList, $this->getFilters()->getKeys(), $filterToTableMapping);
         
+        /*
         $needsSpecificPrice = false;
         foreach ($this->getSelectFields() as $field) {
-            if (strpos($field, 'specific_price.') !== false) {
+            if (strpos($field, 'specific_price.') !== false || strpos($field, 'computed_price') !== false) {
                 $needsSpecificPrice = true;
             }
         }
         foreach ($this->getFilters()->getKeys() as $field) {
-            if (strpos($field, 'specific_price.') !== false) {
+            if (strpos($field, 'specific_price.') !== false || strpos($field, 'computed_price') !== false) {
                 $needsSpecificPrice = true;
             }
         }
         if ($needsSpecificPrice === true) {
             $this->addJoinList($joinList, ['specific_price'], $filterToTableMapping);
-        }
+        }*/
+        $this->addJoinList($joinList, ['specific_price'], $filterToTableMapping);
 
         $operationIdx = 0;
         foreach ($this->getOperationsFilters() as $filterOperations) {
@@ -801,8 +826,9 @@ class MySQL extends AbstractAdapter
                 'quantity',
                 'condition',
                 'weight',
-                "IF (specific_price.reduction_type IS NOT NULL, IF(specific_price.reduction_type = 'percentage', p.price * (1-specific_price.reduction), specific_price.price), p.price) AS price",
+                "IF (specific_price.reduction_type IS NOT NULL, IF(specific_price.reduction_type = 'percentage', p.price * (1-specific_price.reduction), specific_price.price), p.price) AS computed_price",
                 'sales',
+                'price',
             ]
         );
         $this->initialPopulation = clone $this;

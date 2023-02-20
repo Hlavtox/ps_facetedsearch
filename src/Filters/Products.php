@@ -76,13 +76,17 @@ class Products
         $orderBy = Validate::isOrderBy($orderBy) ? $orderBy : 'position';
 
         $this->searchAdapter->setLimit($productsPerPage, ($page - 1) * $productsPerPage);
-        $this->searchAdapter->setOrderField($orderBy);
+        if ($orderBy === 'price') {
+            $this->searchAdapter->setOrderField('computed_price');
+        } else {
+            $this->searchAdapter->setOrderField($orderBy);
+        }
         $this->searchAdapter->setOrderDirection($orderWay);
 
         $this->searchAdapter->addGroupBy('id_product');
         if (isset($selectedFilters['price']) || $orderBy === 'price') {
             $this->searchAdapter->addSelectField('id_product');
-            $this->searchAdapter->addSelectField("IF (specific_price.reduction_type IS NOT NULL, IF(specific_price.reduction_type = 'percentage', p.price * (1-specific_price.reduction), specific_price.price), p.price) AS price");
+            $this->searchAdapter->addSelectField("IF (specific_price.reduction_type IS NOT NULL, IF(specific_price.reduction_type = 'percentage', p.price * (1-specific_price.reduction), specific_price.price), p.price) AS computed_price");
         }
 
         $matchingProductList = $this->searchAdapter->execute();
