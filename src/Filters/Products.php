@@ -82,14 +82,10 @@ class Products
         $this->searchAdapter->addGroupBy('id_product');
         if (isset($selectedFilters['price']) || $orderBy === 'price') {
             $this->searchAdapter->addSelectField('id_product');
-            $this->searchAdapter->addSelectField('price');
-            $this->searchAdapter->addSelectField('price_min');
-            $this->searchAdapter->addSelectField('price_max');
+            $this->searchAdapter->addSelectField("IF (specific_price.reduction_type IS NOT NULL, IF(specific_price.reduction_type = 'percentage', p.price * (1-specific_price.reduction), specific_price.price), p.price) AS price");
         }
 
         $matchingProductList = $this->searchAdapter->execute();
-
-        $this->pricePostFiltering($matchingProductList, $selectedFilters);
 
         $nbrProducts = $this->searchAdapter->count();
 
@@ -101,70 +97,5 @@ class Products
             'products' => $matchingProductList,
             'count' => $nbrProducts,
         ];
-    }
-
-    /**
-     * Post filter product depending on the price and a few extra config variables
-     *
-     * @param array $matchingProductList
-     * @param array $selectedFilters
-     */
-    private function pricePostFiltering(&$matchingProductList, $selectedFilters)
-    {
-        if (!isset($selectedFilters['price'])) {
-            return;
-        }
-
-        $priceFilter['min'] = (float) ($selectedFilters['price'][0]);
-        $priceFilter['max'] = (float) ($selectedFilters['price'][1]);
-
-        if ($this->psLayeredFilterPriceUsetax === null) {
-            $this->psLayeredFilterPriceUsetax = (bool) Configuration::get('PS_LAYERED_FILTER_PRICE_USETAX');
-        }
-
-        if ($this->psLayeredFilterPriceRounding === null) {
-            $this->psLayeredFilterPriceRounding = (bool) Configuration::get('PS_LAYERED_FILTER_PRICE_ROUNDING');
-        }
-
-        if ($this->psLayeredFilterPriceUsetax || $this->psLayeredFilterPriceRounding) {
-            $this->filterPrice(
-                $matchingProductList,
-                $this->psLayeredFilterPriceUsetax,
-                $this->psLayeredFilterPriceRounding,
-                $priceFilter
-            );
-        }
-    }
-
-    /**
-     * Remove products from the product list in case of price postFiltering
-     *
-     * @param array $matchingProductList
-     * @param bool $psLayeredFilterPriceUsetax
-     * @param bool $psLayeredFilterPriceRounding
-     * @param array $priceFilter
-     */
-    private function filterPrice(
-        &$matchingProductList,
-        $psLayeredFilterPriceUsetax,
-        $psLayeredFilterPriceRounding,
-        $priceFilter
-    ) {
-        /* for this case, price could be out of range, so we need to compute the real price */
-        foreach ($matchingProductList as $key => $product) {
-            if (($product['price_min'] < (int) $priceFilter['min'] && $product['price_max'] > (int) $priceFilter['min'])
-                || ($product['price_max'] > (int) $priceFilter['max'] && $product['price_min'] < (int) $priceFilter['max'])
-            ) {
-                $price = Product::getPriceStatic($product['id_product'], $psLayeredFilterPriceUsetax);
-                if ($psLayeredFilterPriceRounding) {
-                    $price = (int) $price;
-                }
-
-                if ($price < $priceFilter['min'] || $price > $priceFilter['max']) {
-                    // out of range price, exclude the product
-                    unset($matchingProductList[$key]);
-                }
-            }
-        }
     }
 }

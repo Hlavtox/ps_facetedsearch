@@ -239,7 +239,7 @@ class Block
             'nbr' => $nbProducts,
         ];
 
-        list($priceMinFilter, $priceMaxFilter, $weightFilter) = $this->ignorePriceAndWeightFilters(
+        list($priceFilter, $weightFilter) = $this->ignorePriceAndWeightFilters(
             $this->searchAdapter->getInitialPopulation()
         );
 
@@ -248,8 +248,7 @@ class Block
 
         $this->restorePriceAndWeightFilters(
             $this->searchAdapter->getInitialPopulation(),
-            $priceMinFilter,
-            $priceMaxFilter,
+            $priceFilter,
             $weightFilter
         );
 
@@ -268,16 +267,13 @@ class Block
     private function ignorePriceAndWeightFilters(InterfaceAdapter $filteredSearchAdapter)
     {
         // disable the current price and weight filters to compute ranges
-        $priceMinFilter = $filteredSearchAdapter->getFilter('price_min');
-        $priceMaxFilter = $filteredSearchAdapter->getFilter('price_max');
+        $priceFilter = $filteredSearchAdapter->getFilter('price');
         $weightFilter = $filteredSearchAdapter->getFilter('weight');
-        $filteredSearchAdapter->resetFilter('price_min');
-        $filteredSearchAdapter->resetFilter('price_max');
+        $filteredSearchAdapter->resetFilter('price');
         $filteredSearchAdapter->resetFilter('weight');
 
         return [
-            $priceMinFilter,
-            $priceMaxFilter,
+            $priceFilter,
             $weightFilter,
         ];
     }
@@ -292,13 +288,11 @@ class Block
      */
     private function restorePriceAndWeightFilters(
         $filteredSearchAdapter,
-        $priceMinFilter,
-        $priceMaxFilter,
+        $priceFilter,
         $weightFilter
     ) {
         // put back the price and weight filters
-        $filteredSearchAdapter->setFilter('price_min', $priceMinFilter);
-        $filteredSearchAdapter->setFilter('price_max', $priceMaxFilter);
+        $filteredSearchAdapter->setFilter('price', $priceFilter);
         $filteredSearchAdapter->setFilter('weight', $weightFilter);
     }
 
@@ -328,7 +322,7 @@ class Block
             'nbr' => $nbProducts,
         ];
 
-        list($priceMinFilter, $priceMaxFilter, $weightFilter) = $this->ignorePriceAndWeightFilters(
+        list($priceFilter, $weightFilter) = $this->ignorePriceAndWeightFilters(
             $this->searchAdapter->getInitialPopulation()
         );
 
@@ -342,8 +336,7 @@ class Block
 
         $this->restorePriceAndWeightFilters(
             $this->searchAdapter->getInitialPopulation(),
-            $priceMinFilter,
-            $priceMaxFilter,
+            $priceFilter,
             $weightFilter
         );
 

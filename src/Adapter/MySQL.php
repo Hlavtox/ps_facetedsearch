@@ -51,7 +51,7 @@ class MySQL extends AbstractAdapter
     {
         $mysqlAdapter = $this->getFilteredSearchAdapter();
         $mysqlAdapter->copyFilters($this);
-        $mysqlAdapter->setSelectFields(['price_min', 'MIN(price_min) as min, MAX(price_max) as max']);
+        $mysqlAdapter->setSelectFields(["MIN(IF (specific_price.reduction_type IS NOT NULL, IF(specific_price.reduction_type = 'percentage', p.price * (1-specific_price.reduction), specific_price.price), p.price)) as min, MAX(IF (specific_price.reduction_type IS NOT NULL, IF(specific_price.reduction_type = 'percentage', p.price * (1-specific_price.reduction), specific_price.price), p.price)) as max"]);
         $mysqlAdapter->setLimit(null);
         $mysqlAdapter->setOrderField('');
 
@@ -258,20 +258,6 @@ class MySQL extends AbstractAdapter
                 'aggregateFunction' => 'SUM',
                 'aggregateFieldName' => 'quantity',
             ],
-            'price_min' => [
-                'tableName' => 'layered_price_index',
-                'tableAlias' => 'psi',
-                'joinCondition' => '(psi.id_product = p.id_product AND psi.id_shop = ' . $this->getContext()->shop->id . ' AND psi.id_currency = ' .
-                $this->getContext()->currency->id . ' AND psi.id_country = ' . $this->getContext()->country->id . ')',
-                'joinType' => self::INNER_JOIN,
-            ],
-            'price_max' => [
-                'tableName' => 'layered_price_index',
-                'tableAlias' => 'psi',
-                'joinCondition' => '(psi.id_product = p.id_product AND psi.id_shop = ' . $this->getContext()->shop->id . ' AND psi.id_currency = ' .
-                $this->getContext()->currency->id . ' AND psi.id_country = ' . $this->getContext()->country->id . ')',
-                'joinType' => self::INNER_JOIN,
-            ],
             'range_start' => [
                 'tableName' => 'layered_price_index',
                 'tableAlias' => 'psi',
@@ -319,6 +305,24 @@ class MySQL extends AbstractAdapter
                 )',
                 'joinType' => self::INNER_JOIN,
             ],
+            'specific_price' => [
+                'tableName' => 'specific_price',
+                'tableAlias' => 'specific_price',
+                'joinCondition' => '(
+                    specific_price.id_product = p.id_product AND 
+                    specific_price.id_shop IN (0, ' . $this->getContext()->shop->id . ') AND 
+                    specific_price.id_currency IN (0, ' . $this->getContext()->currency->id . ') AND 
+                    specific_price.id_country IN (0, ' . $this->getContext()->country->id . ') AND 
+                    specific_price.id_group IN (0, ' . $this->getContext()->customer->id_default_group . ') AND 
+                    specific_price.from_quantity = 1 AND
+                    specific_price.reduction > 0 AND
+                    specific_price.id_customer = 0 AND
+                    specific_price.id_cart = 0 AND 
+                    (specific_price.from = \'0000-00-00 00:00:00\' OR \'' . date('Y-m-d H:i:s') . '\' >= specific_price.from) AND 
+                    (specific_price.to = \'0000-00-00 00:00:00\' OR \'' . date('Y-m-d H:i:s') . '\' <= specific_price.to) 
+                )',
+                'joinType' => self::LEFT_JOIN,
+            ],
         ];
 
         return $filterToTableMapping;
@@ -358,7 +362,7 @@ class MySQL extends AbstractAdapter
     {
         $orderField = $this->getOrderField();
 
-        if ($this->getInitialPopulation() !== null && !empty($orderField)) {
+        if ($this->getInitialPopulation() !== null && !empty($orderField) && $orderField != 'price') {
             $this->getInitialPopulation()->addSelectField($orderField);
         }
 
@@ -366,10 +370,6 @@ class MySQL extends AbstractAdapter
         if (empty($orderField) || strpos($orderField, '.') !== false
             || strpos($orderField, '(') !== false) {
             return $orderField;
-        }
-
-        if ($orderField === 'price') {
-            $orderField = $this->getOrderDirection() === 'asc' ? 'price_min' : 'price_max';
         }
 
         $orderField = $this->computeFieldName($orderField, $filterToTableMapping, true);
@@ -614,6 +614,21 @@ class MySQL extends AbstractAdapter
 
         $this->addJoinList($joinList, $this->getSelectFields(), $filterToTableMapping);
         $this->addJoinList($joinList, $this->getFilters()->getKeys(), $filterToTableMapping);
+        
+        $needsSpecificPrice = false;
+        foreach ($this->getSelectFields() as $field) {
+            if (strpos($field, 'specific_price.') !== false) {
+                $needsSpecificPrice = true;
+            }
+        }
+        foreach ($this->getFilters()->getKeys() as $field) {
+            if (strpos($field, 'specific_price.') !== false) {
+                $needsSpecificPrice = true;
+            }
+        }
+        if ($needsSpecificPrice === true) {
+            $this->addJoinList($joinList, ['specific_price'], $filterToTableMapping);
+        }
 
         $operationIdx = 0;
         foreach ($this->getOperationsFilters() as $filterOperations) {
@@ -786,7 +801,7 @@ class MySQL extends AbstractAdapter
                 'quantity',
                 'condition',
                 'weight',
-                'price',
+                "IF (specific_price.reduction_type IS NOT NULL, IF(specific_price.reduction_type = 'percentage', p.price * (1-specific_price.reduction), specific_price.price), p.price) AS price",
                 'sales',
             ]
         );

@@ -354,6 +354,8 @@ class Ps_Facetedsearch extends Module implements WidgetInterface
     }
 
     /**
+     * @deprecated Price index is no longer used
+     *
      * Full prices index process
      *
      * @param int $cursor in order to restart indexing from the last state
@@ -362,14 +364,12 @@ class Ps_Facetedsearch extends Module implements WidgetInterface
      */
     public function fullPricesIndexProcess($cursor = 0, $ajax = false, $smart = false)
     {
-        if ($cursor == 0 && !$smart) {
-            $this->rebuildPriceIndexTable();
-        }
-
-        return $this->indexPrices($cursor, true, $ajax, $smart);
+        return true;
     }
 
     /**
+     * @deprecated Price index is no longer used
+     *
      * Prices index process
      *
      * @param int $cursor in order to restart indexing from the last state
@@ -377,10 +377,12 @@ class Ps_Facetedsearch extends Module implements WidgetInterface
      */
     public function pricesIndexProcess($cursor = 0, $ajax = false)
     {
-        return $this->indexPrices($cursor, false, $ajax);
+        return true;
     }
 
     /**
+     * @deprecated Price index is no longer used
+     *
      * Index product prices
      *
      * @param int $idProduct
@@ -388,202 +390,7 @@ class Ps_Facetedsearch extends Module implements WidgetInterface
      */
     public function indexProductPrices($idProduct, $smart = true)
     {
-        static $groups = null;
-
-        if ($groups === null) {
-            $groups = $this->getDatabase()->executeS('SELECT id_group FROM `' . _DB_PREFIX_ . 'group_reduction`');
-            if (!$groups) {
-                $groups = [];
-            }
-        }
-
-        $shopList = Shop::getShops(false, null, true);
-
-        foreach ($shopList as $idShop) {
-            $currencyList = Currency::getCurrencies(false, 1, new Shop($idShop));
-
-            $minPrice = [];
-            $maxPrice = [];
-
-            if ($smart) {
-                $this->getDatabase()->execute('DELETE FROM `' . _DB_PREFIX_ . 'layered_price_index` WHERE `id_product` = ' . (int) $idProduct . ' AND `id_shop` = ' . (int) $idShop);
-            }
-
-            $taxRatesByCountry = $this->getDatabase()->executeS(
-                'SELECT t.rate rate, tr.id_country, c.iso_code ' .
-                'FROM `' . _DB_PREFIX_ . 'product_shop` p ' .
-                'LEFT JOIN `' . _DB_PREFIX_ . 'tax_rules_group` trg ON  ' .
-                '(trg.id_tax_rules_group = p.id_tax_rules_group AND p.id_shop = ' . (int) $idShop . ') ' .
-                'LEFT JOIN `' . _DB_PREFIX_ . 'tax_rule` tr ON (tr.id_tax_rules_group = trg.id_tax_rules_group) ' .
-                'LEFT JOIN `' . _DB_PREFIX_ . 'tax` t ON (t.id_tax = tr.id_tax AND t.active = 1) ' .
-                'JOIN `' . _DB_PREFIX_ . 'country` c ON (tr.id_country=c.id_country AND c.active = 1) ' .
-                'WHERE id_product = ' . (int) $idProduct . ' ' .
-                'GROUP BY id_product, tr.id_country'
-            );
-
-            if (empty($taxRatesByCountry) || !Configuration::get('PS_LAYERED_FILTER_PRICE_USETAX')) {
-                $shopCountries = Country::getCountriesByIdShop($idShop, $this->getContext()->language->id);
-                $taxCountries = array_filter($shopCountries, function ($country) {
-                    return $country['active'];
-                });
-                $taxRatesByCountry = array_map(function ($country) {
-                    return [
-                        'rate' => 0,
-                        'id_country' => $country['id_country'],
-                        'iso_code' => $country['iso_code'],
-                    ];
-                }, $taxCountries);
-            }
-
-            $productMinPrices = $this->getDatabase()->executeS(
-                'SELECT id_shop, id_currency, id_country, id_group, from_quantity
-                FROM `' . _DB_PREFIX_ . 'specific_price`
-                WHERE id_product = ' . (int) $idProduct . ' AND id_shop IN (0,' . (int) $idShop . ')'
-            );
-
-            $countries = Country::getCountries($this->getContext()->language->id, true, false, false);
-            foreach ($countries as $country) {
-                $idCountry = $country['id_country'];
-
-                // Get price by currency & country, without reduction!
-                foreach ($currencyList as $currency) {
-                    $price = Product::priceCalculation(
-                        $idShop,
-                        (int) $idProduct,
-                        null,
-                        $idCountry,
-                        null,
-                        null,
-                        $currency['id_currency'],
-                        null,
-                        null,
-                        false,
-                        6, // Decimals
-                        false,
-                        false,
-                        true,
-                        $specificPriceOutput,
-                        true
-                    );
-
-                    $minPrice[$idCountry][$currency['id_currency']] = $price;
-                    $maxPrice[$idCountry][$currency['id_currency']] = $price;
-                }
-
-                foreach ($productMinPrices as $specificPrice) {
-                    foreach ($currencyList as $currency) {
-                        if ($specificPrice['id_currency'] &&
-                            $specificPrice['id_currency'] != $currency['id_currency']
-                        ) {
-                            continue;
-                        }
-
-                        $price = Product::priceCalculation(
-                            $idShop,
-                            (int) $idProduct,
-                            null,
-                            $idCountry,
-                            null,
-                            null,
-                            $currency['id_currency'],
-                            (($specificPrice['id_group'] == 0) ? null : $specificPrice['id_group']),
-                            $specificPrice['from_quantity'],
-                            false,
-                            6,
-                            false,
-                            true,
-                            true,
-                            $specificPriceOutput,
-                            true
-                        );
-
-                        if ($price > $maxPrice[$idCountry][$currency['id_currency']]) {
-                            $maxPrice[$idCountry][$currency['id_currency']] = $price;
-                        }
-
-                        if ($price == 0) {
-                            continue;
-                        }
-
-                        if (null === $minPrice[$idCountry][$currency['id_currency']] || $price < $minPrice[$idCountry][$currency['id_currency']]) {
-                            $minPrice[$idCountry][$currency['id_currency']] = $price;
-                        }
-                    }
-                }
-
-                foreach ($groups as $group) {
-                    foreach ($currencyList as $currency) {
-                        $price = Product::priceCalculation(
-                            $idShop,
-                            (int) $idProduct,
-                            null,
-                            (int) $idCountry,
-                            null,
-                            null,
-                            (int) $currency['id_currency'],
-                            (int) $group['id_group'],
-                            null,
-                            false,
-                            6,
-                            false,
-                            true,
-                            true,
-                            $specificPriceOutput,
-                            true
-                        );
-
-                        if (!isset($maxPrice[$idCountry][$currency['id_currency']])) {
-                            $maxPrice[$idCountry][$currency['id_currency']] = 0;
-                        }
-
-                        if (!isset($minPrice[$idCountry][$currency['id_currency']])) {
-                            $minPrice[$idCountry][$currency['id_currency']] = null;
-                        }
-
-                        if ($price == 0) {
-                            continue;
-                        }
-
-                        if (null === $minPrice[$idCountry][$currency['id_currency']] || $price < $minPrice[$idCountry][$currency['id_currency']]) {
-                            $minPrice[$idCountry][$currency['id_currency']] = $price;
-                        }
-
-                        if ($price > $maxPrice[$idCountry][$currency['id_currency']]) {
-                            $maxPrice[$idCountry][$currency['id_currency']] = $price;
-                        }
-                    }
-                }
-            }
-
-            $values = [];
-            foreach ($taxRatesByCountry as $taxRateByCountry) {
-                $taxRate = $taxRateByCountry['rate'];
-                $idCountry = $taxRateByCountry['id_country'];
-                foreach ($currencyList as $currency) {
-                    $minPriceValue = array_key_exists($idCountry, $minPrice) ? $minPrice[$idCountry][$currency['id_currency']] : 0;
-                    $maxPriceValue = array_key_exists($idCountry, $maxPrice) ? $maxPrice[$idCountry][$currency['id_currency']] : 0;
-                    if (!in_array($taxRateByCountry['iso_code'], self::ISO_CODE_TAX_FREE)) {
-                        $minPriceValue = Tools::ps_round($minPriceValue * (100 + $taxRate) / 100, self::DECIMAL_DIGITS);
-                        $maxPriceValue = Tools::ps_round($maxPriceValue * (100 + $taxRate) / 100, self::DECIMAL_DIGITS);
-                    }
-
-                    $values[] = '(' . (int) $idProduct . ',
-                        ' . (int) $currency['id_currency'] . ',
-                        ' . $idShop . ',
-                        ' . (float) $minPriceValue . ',
-                        ' . (float) $maxPriceValue . ',
-                        ' . (int) $idCountry . ')';
-                }
-            }
-
-            if (!empty($values)) {
-                $this->getDatabase()->execute(
-                    'INSERT INTO `' . _DB_PREFIX_ . 'layered_price_index` (id_product, id_currency, id_shop, price_min, price_max, id_country)
-                     VALUES ' . implode(',', $values) . '
-                     ON DUPLICATE KEY UPDATE id_product = id_product' // Avoid duplicate keys
-                );
-            }
-        }
+        return true;
     }
 
     /**
@@ -1371,26 +1178,13 @@ VALUES(' . $last_id . ', ' . (int) $idShop . ')');
     }
 
     /**
+     * @deprecated Price index is no longer used
+     *
      * Install price indexes table
      */
     public function rebuildPriceIndexTable()
     {
-        $this->getDatabase()->execute('DROP TABLE IF EXISTS `' . _DB_PREFIX_ . 'layered_price_index`');
-
-        $this->getDatabase()->execute(
-            'CREATE TABLE `' . _DB_PREFIX_ . 'layered_price_index` (
-            `id_product` INT  NOT NULL,
-            `id_currency` INT NOT NULL,
-            `id_shop` INT NOT NULL,
-            `price_min` DECIMAL(20, 6) NOT NULL,
-            `price_max` DECIMAL(20, 6) NOT NULL,
-            `id_country` INT NOT NULL,
-            PRIMARY KEY (`id_product`, `id_currency`, `id_shop`, `id_country`),
-            INDEX `id_currency` (`id_currency`),
-            INDEX `price_min` (`price_min`),
-            INDEX `price_max` (`price_max`)
-            ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8;'
-        );
+        return true;
     }
 
     /**
@@ -1490,130 +1284,6 @@ VALUES(' . $last_id . ', ' . (int) $idShop . ')');
             PRIMARY KEY (`id_feature_value`, `id_lang`)
             ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8;'
         );
-    }
-
-    /**
-     * Index prices
-     *
-     * @param int $cursor last indexed id_product
-     * @param bool $full
-     * @param bool $ajax
-     * @param bool $smart
-     *
-     * @return int|string|bool
-     */
-    private function indexPrices($cursor = 0, $full = false, $ajax = false, $smart = false)
-    {
-        if ($full) {
-            $nbProducts = (int) $this->getDatabase()->getValue(
-                'SELECT count(DISTINCT p.`id_product`) ' .
-                'FROM ' . _DB_PREFIX_ . 'product p ' .
-                'INNER JOIN `' . _DB_PREFIX_ . 'product_shop` ps ' .
-                'ON (ps.`id_product` = p.`id_product` AND ps.`active` = 1 AND ps.`visibility` IN ("both", "catalog"))'
-            );
-        } else {
-            $nbProducts = (int) $this->getDatabase()->getValue(
-                'SELECT COUNT(DISTINCT p.`id_product`) ' .
-                'FROM `' . _DB_PREFIX_ . 'product` p ' .
-                'INNER JOIN `' . _DB_PREFIX_ . 'product_shop` ps ON (ps.`id_product` = p.`id_product` AND ps.`active` = 1 AND ps.`visibility` IN ("both", "catalog")) ' .
-                'LEFT JOIN  `' . _DB_PREFIX_ . 'layered_price_index` psi ON (psi.id_product = p.id_product) ' .
-                'WHERE psi.id_product IS NULL'
-            );
-        }
-
-        $maxExecutiontime = @ini_get('max_execution_time');
-        if ($maxExecutiontime > 5 || $maxExecutiontime <= 0) {
-            $maxExecutiontime = 5;
-        }
-
-        $startTime = microtime(true);
-
-        $indexedProducts = 0;
-        $length = 100;
-        do {
-            $lastCursor = $cursor;
-            $cursor = (int) $this->indexPricesUnbreakable((int) $cursor, $full, $smart, $length);
-            if ($cursor == 0) {
-                $lastCursor = $cursor;
-                break;
-            }
-            $time_elapsed = microtime(true) - $startTime;
-            $indexedProducts += $length;
-        } while (
-            $cursor < $nbProducts
-            && (Tools::getMemoryLimit() == -1 || Tools::getMemoryLimit() > memory_get_peak_usage())
-            && $time_elapsed < $maxExecutiontime
-        );
-
-        if (($nbProducts > 0 && !$full || $cursor != $lastCursor && $full) && !$ajax) {
-            return $this->indexPrices((int) $cursor, $full, $ajax, $smart);
-        }
-
-        if ($ajax && $nbProducts > 0 && $cursor != $lastCursor && $full) {
-            return json_encode([
-                'total' => $nbProducts,
-                'cursor' => $cursor,
-                'count' => $indexedProducts,
-            ]);
-        }
-
-        if ($ajax && $nbProducts > 0 && !$full) {
-            return json_encode([
-                'total' => $nbProducts,
-                'cursor' => $cursor,
-                'count' => $indexedProducts,
-            ]);
-        }
-
-        Configuration::updateGlobalValue('PS_LAYERED_INDEXED', 1);
-
-        if ($ajax) {
-            return json_encode([
-                'result' => 'ok',
-            ]);
-        }
-
-        return $nbProducts;
-    }
-
-    /**
-     * Index prices unbreakable
-     *
-     * @param int $cursor last indexed id_product
-     * @param bool $full All products, otherwise only indexed products
-     * @param bool $smart Delete before reindex
-     * @param int $length nb of products to index
-     *
-     * @return int
-     */
-    private function indexPricesUnbreakable($cursor, $full = false, $smart = false, $length = 100)
-    {
-        if ($full) {
-            $query = 'SELECT p.`id_product` ' .
-                'FROM `' . _DB_PREFIX_ . 'product` p ' .
-                'INNER JOIN `' . _DB_PREFIX_ . 'product_shop` ps ' .
-                'ON (ps.`id_product` = p.`id_product` AND ps.`active` = 1 AND ps.`visibility` IN ("both", "catalog")) ' .
-                'WHERE p.id_product > ' . (int) $cursor . ' ' .
-                'GROUP BY p.`id_product` ' .
-                'ORDER BY p.`id_product` LIMIT 0,' . (int) $length;
-        } else {
-            $query = 'SELECT p.`id_product` ' .
-                'FROM `' . _DB_PREFIX_ . 'product` p ' .
-                'INNER JOIN `' . _DB_PREFIX_ . 'product_shop` ps ' .
-                'ON (ps.`id_product` = p.`id_product` AND ps.`active` = 1 AND ps.`visibility` IN ("both", "catalog")) ' .
-                'LEFT JOIN  `' . _DB_PREFIX_ . 'layered_price_index` psi ON (psi.id_product = p.id_product) ' .
-                'WHERE psi.id_product IS NULL ' .
-                'GROUP BY p.`id_product` ' .
-                'ORDER BY p.`id_product` LIMIT 0,' . (int) $length;
-        }
-
-        $lastIdProduct = 0;
-        foreach ($this->getDatabase()->executeS($query) as $product) {
-            $this->indexProductPrices((int) $product['id_product'], ($smart && $full));
-            $lastIdProduct = $product['id_product'];
-        }
-
-        return (int) $lastIdProduct;
     }
 
     /**
