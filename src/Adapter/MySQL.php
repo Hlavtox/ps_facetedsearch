@@ -638,7 +638,6 @@ class MySQL extends AbstractAdapter
         $this->addJoinList($joinList, $this->getSelectFields(), $filterToTableMapping);
         $this->addJoinList($joinList, $this->getFilters()->getKeys(), $filterToTableMapping);
         
-        /*
         $needsSpecificPrice = false;
         foreach ($this->getSelectFields() as $field) {
             if (strpos($field, 'specific_price.') !== false || strpos($field, 'computed_price') !== false) {
@@ -652,8 +651,7 @@ class MySQL extends AbstractAdapter
         }
         if ($needsSpecificPrice === true) {
             $this->addJoinList($joinList, ['specific_price'], $filterToTableMapping);
-        }*/
-        $this->addJoinList($joinList, ['specific_price'], $filterToTableMapping);
+        }
 
         $operationIdx = 0;
         foreach ($this->getOperationsFilters() as $filterOperations) {
