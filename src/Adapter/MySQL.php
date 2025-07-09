@@ -129,9 +129,17 @@ class MySQL extends AbstractAdapter
         }
 
         if ($orderField) {
-            $query .= ' ORDER BY ' . $orderField . ' ' . strtoupper($this->getOrderDirection());
-            if ($orderField !== 'p.id_product') {
-                $query .= ', p.id_product DESC';
+            // Do not modify new order field in some cases at all
+            if (strpos($orderField, 'FIELD(p.id_product') !== false) {
+                $query .= ' ORDER BY ' . $orderField . ' ';
+            // Otherwise, add it with direction
+            } else {
+                $query .= ' ORDER BY ' . $orderField . ' ' . strtoupper($this->getOrderDirection());
+
+                // Add fallback to id_product to avoid SQL returning it in random order
+                if ($orderField !== 'p.id_product') {
+                    $query .= ', p.id_product DESC';
+                }
             }
         }
 
@@ -384,6 +392,11 @@ class MySQL extends AbstractAdapter
 
         // Alter order by field and add some products to the end of the list, if required
         $orderField = $this->computeShowLast($orderField, $filterToTableMapping);
+
+        // Custom sort by IDs on search page
+        if ($orderField == 'p.position' && !empty($this->getInitialPopulation()->getFilters()['id_product']['='][0])) {
+            $orderField = "FIELD(p.id_product," . implode(',', $this->getInitialPopulation()->getFilters()['id_product']['='][0]) . ")";
+        }
 
         return $orderField;
     }
