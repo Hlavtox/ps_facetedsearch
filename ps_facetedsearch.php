@@ -1757,20 +1757,12 @@ VALUES(' . $last_id . ', ' . (int) $idShop . ')');
             ],
         ];
 
-        $additionalSupportedControllers = Hook::exec(
+        Hook::exec(
             'actionFacetedSearchSetSupportedControllers',
-            [],
-            null,
-            true,
-            true,
-            false,
-            null,
-            true
+            [
+                'supportedControllers' => &$supportedControllers,
+            ]
         );
-
-        if ($additionalSupportedControllers && is_array($additionalSupportedControllers)) {
-            $supportedControllers = array_merge($supportedControllers, $additionalSupportedControllers);
-        }
 
         $this->setSupportedControllers($supportedControllers);
     }
