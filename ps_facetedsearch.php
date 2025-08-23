@@ -1726,7 +1726,7 @@ VALUES(' . $last_id . ', ' . (int) $idShop . ')');
 
     public function initializeSupportedControllers()
     {
-        $this->setSupportedControllers([
+        $supportedControllers = [
             'category' => [
                 'name' => $this->trans('Category', [], 'Modules.Facetedsearch.Admin'),
                 'cacheable' => true,
@@ -1755,6 +1755,23 @@ VALUES(' . $last_id . ', ' . (int) $idShop . ')');
                 'name' => $this->trans('Search', [], 'Modules.Facetedsearch.Admin'),
                 'cacheable' => false,
             ],
-        ]);
+        ];
+
+        $additionalSupportedControllers = Hook::exec(
+            'actionFacetedSearchSetSupportedControllers',
+            [],
+            null,
+            true,
+            true,
+            false,
+            null,
+            true
+        );
+
+        if ($additionalSupportedControllers && is_array($additionalSupportedControllers)) {
+            $supportedControllers = array_merge($supportedControllers, $additionalSupportedControllers);
+        }
+
+        $this->setSupportedControllers($supportedControllers);
     }
 }
