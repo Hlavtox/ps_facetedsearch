@@ -25,7 +25,6 @@ use Configuration;
 use Context;
 use Db;
 use Group;
-use PrestaShop\PrestaShop\Core\Localization\Locale;
 use Manufacturer;
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryTestCase;
@@ -34,6 +33,7 @@ use PrestaShop\Module\FacetedSearch\Definition\Availability;
 use PrestaShop\Module\FacetedSearch\Filters\Block;
 use PrestaShop\Module\FacetedSearch\Filters\DataAccessor;
 use PrestaShop\Module\FacetedSearch\Filters\Provider;
+use PrestaShop\PrestaShop\Core\Localization\Locale;
 use PrestaShop\PrestaShop\Core\Product\Search\ProductSearchQuery;
 use PrestaShopBundle\Translation\TranslatorComponent;
 use Shop;
@@ -79,7 +79,7 @@ class BlockTest extends MockeryTestCase
         $locale->shouldReceive('getPriceSpecification')
             ->with('EUR')
             ->andReturn($this->getPriceSpecificationMock());
-        
+
         // Mock context
         $this->contextMock = Mockery::mock(Context::class);
         $this->contextMock->shop = new stdClass();
