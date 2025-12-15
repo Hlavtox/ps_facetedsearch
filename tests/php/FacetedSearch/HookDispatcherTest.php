@@ -68,7 +68,6 @@ class HookDispatcherTest extends MockeryTestCase
                 'actionAfterUpdateAttributeGroupFormHandler',
                 'actionCategoryAdd',
                 'actionCategoryDelete',
-                'actionCategoryUpdate',
                 'actionProductPreferencesPageStockSave',
                 'displayLeftColumn',
                 'actionFeatureSave',
