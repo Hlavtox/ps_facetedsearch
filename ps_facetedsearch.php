@@ -365,7 +365,7 @@ class Ps_Facetedsearch extends Module implements WidgetInterface
         } elseif ($cursor == 0) {
             $this->getDatabase()->execute(
                 'DELETE psi FROM `' . _DB_PREFIX_ . 'layered_price_index` psi ' .
-                'LEFT JOIN `' . _DB_PREFIX_ . 'product_shop` ps ON (ps.`id_product` = psi.`id_product` AND ps.`active` = 1 AND ps.`visibility` IN ("both", "catalog")) ' .
+                'LEFT JOIN `' . _DB_PREFIX_ . 'product_shop` ps ON (ps.`id_product` = psi.`id_product` AND ps.`id_shop` = psi.`id_shop` AND ps.`active` = 1 AND ps.`visibility` IN (\'both\', \'catalog\')) ' .
                 'WHERE ps.`id_product` IS NULL'
             );
         }
